@@ -1,0 +1,101 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION   = "ap-south-1"
+        TERRAFORM_DIR = "terraform"
+        ANSIBLE_DIR   = "ansible"
+    }
+
+    stages {
+        stage('Terraform Init & Apply') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    withCredentials([usernamePassword(credentialsId: 'aws-creds',
+                                                      usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                                      passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=${AWS_REGION}
+
+                            terraform init -input=false
+                            terraform apply -auto-approve -input=false -var "key_name=kkey-vot"
+
+                            terraform output -raw instance_ip > ../${ANSIBLE_DIR}/host_ip.txt
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Configure EC2 with Ansible') {
+            steps {
+                sshagent(['voting-key']) {
+                    sh '''
+                        EC2_IP=$(cat ansible/host_ip.txt)
+
+                        # Wait until SSH port 22 is open
+                        echo "Waiting for SSH on $EC2_IP..."
+                        until nc -zv $EC2_IP 22; do
+                            echo "SSH not ready yet. Sleeping 5 seconds..."
+                            sleep 5
+                        done
+
+                        # Dynamic inventory with StrictHostKeyChecking disabled
+                        echo "[app_server]" > ansible/inventory.ini
+                        echo "$EC2_IP ansible_user=ubuntu ansible_ssh_private_key_file=/tmp/jenkins_ssh_key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> ansible/inventory.ini
+
+                        cd ansible
+                        ansible-playbook -i inventory.ini playbook.yml
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy App') {
+            steps {
+                sshagent(['voting-key']) {
+                    sh '''
+                        EC2_IP=$(cat ansible/host_ip.txt)
+
+                        # Wait until SSH port 22 is open (in case the previous stage took time)
+                        echo "Waiting for SSH on $EC2_IP..."
+                        until nc -zv $EC2_IP 22; do
+                            echo "SSH not ready yet. Sleeping 5 seconds..."
+                            sleep 5
+                        done
+
+                        ssh -o StrictHostKeyChecking=no ubuntu@$EC2_IP "
+                            if [ ! -d ~/online-voting ]; then
+                                git clone https://github.com/karuna299/online-voting.git ~/online-voting
+                            fi
+                            cd ~/online-voting
+                            git pull origin main
+                            docker compose up -d --build
+                        "
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Pipeline failed. Destroying infrastructure..."
+            dir('terraform') {
+                withCredentials([usernamePassword(credentialsId: 'aws-creds', 
+                                                  usernameVariable: 'AWS_ACCESS_KEY_ID',
+                                                  passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=${AWS_REGION}
+
+                        terraform destroy -auto-approve -input=false -var key_name=kkey-vot
+                    '''
+                }
+            }
+        }
+    }
+}

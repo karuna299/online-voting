@@ -1,0 +1,12 @@
+venv/
+.env/
+myenv/
+.pytest_cache/
+app/__pycache__
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate*
+.terraform.lock.hcl
+.tfvars
+ansible/inventory.ini

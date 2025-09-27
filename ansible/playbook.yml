@@ -1,0 +1,67 @@
+- name: Configure EC2 for Online Voting System
+  hosts: app_server
+  become: yes
+
+  pre_tasks:
+    - name: Wait for instance to be reachable via SSH
+      wait_for_connection:
+        timeout: 300
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install dependencies for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+        filename: docker
+
+    - name: Install Docker Engine and CLI
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+        state: present
+        update_cache: yes
+
+    - name: Install Docker Compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+
+    - name: Ensure ubuntu user can run Docker without sudo
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Enable and start Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - debug:
+        msg: "Docker is installed: {{ docker_version.stdout }}"
