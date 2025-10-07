@@ -39,7 +39,7 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
+        stage('Run Unit & Integration Tests') {
             steps {
                 echo 'Running pytest inside the web container (excluding Selenium tests)...'
                 sh """
@@ -56,10 +56,26 @@ pipeline {
             }
         }
 
-        stage('Publish Test Report') {
+        stage('Run Selenium Tests') {
             steps {
-                echo 'Publishing pytest results...'
-                junit allowEmptyResults: true, testResults: 'report.xml'
+                echo 'Running Selenium (UI) tests in headless mode...'
+                sh """
+                docker-compose exec -T ${WEB_SERVICE} /bin/bash -c '
+                    export PYTHONPATH=/app &&
+                    pytest -v --disable-warnings tests/test_ui.py \
+                           --junitxml=/tmp/selenium-report.xml || true
+                '
+                """
+
+                echo 'Copying Selenium report...'
+                sh "docker cp \$(docker-compose ps -q ${WEB_SERVICE}):/tmp/selenium-report.xml selenium-report.xml || true"
+            }
+        }
+
+        stage('Publish Test Reports') {
+            steps {
+                echo 'Publishing all test results...'
+                junit allowEmptyResults: true, testResults: 'report.xml, selenium-report.xml'
             }
         }
 
