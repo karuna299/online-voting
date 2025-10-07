@@ -8,8 +8,8 @@ def test_homepage():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
 
-    # Use pre-installed Chromium driver from Docker
-    driver = webdriver.Chrome(service=Service("/usr/bin/chromium-driver"), options=chrome_options)
+    
+    driver = webdriver.Chrome(options=chrome_options)
 
     driver.get("http://localhost:5000")  # inside Docker network
 

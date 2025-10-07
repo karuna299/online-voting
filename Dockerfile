@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     chromium \
     chromium-driver \
+    && ln -s /usr/bin/chromium-driver /usr/bin/chromedriver \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
