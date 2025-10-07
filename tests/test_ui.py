@@ -18,7 +18,7 @@ def test_homepage():
 
     # Install ChromeDriver matching installed Chromium
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager(version=chrome_major_version).install()),
+        service=Service(ChromeDriverManager(driver_version=chrome_major_version).install()),
         options=chrome_options
     )
 
