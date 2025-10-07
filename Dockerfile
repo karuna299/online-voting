@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install system dependencies for Chrome
+# Install system dependencies for Chromium
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -10,15 +10,15 @@ RUN apt-get update && apt-get install -y \
     chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
-# Set display port to avoid errors
-ENV DISPLAY=:99
-
 # Set working directory
 WORKDIR /app
 
-# Install Python dependencies
+# Copy requirements and install Python dependencies
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-cache ChromeDriver to avoid downloading at runtime
+RUN python -c "from webdriver_manager.chrome import ChromeDriverManager; from selenium.webdriver.chrome.service import Service; Service(ChromeDriverManager().install())"
 
 # Copy app source
 COPY . .

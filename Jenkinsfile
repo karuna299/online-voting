@@ -50,7 +50,6 @@ pipeline {
                            --junitxml=/tmp/report.xml || true
                 '
                 """
-
                 echo 'Copying test report...'
                 sh "docker cp \$(docker-compose ps -q ${WEB_SERVICE}):/tmp/report.xml report.xml || true"
             }
@@ -66,7 +65,6 @@ pipeline {
                            --junitxml=/tmp/selenium-report.xml || true
                 '
                 """
-
                 echo 'Copying Selenium report...'
                 sh "docker cp \$(docker-compose ps -q ${WEB_SERVICE}):/tmp/selenium-report.xml selenium-report.xml || true"
             }
